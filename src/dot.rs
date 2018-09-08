@@ -8,10 +8,10 @@ use std::rc::Rc;
 
 pub use self::dot::render;
 
-type ClassNode = Rc<Class>;
-type RelationEdge = Box<Relation>;
+type ClassNode<'a> = Rc<Class<'a>>;
+type RelationEdge<'a> = Box<Relation<'a>>;
 
-impl<'a> dot::Labeller<'a, ClassNode, RelationEdge> for Diagram<'a> {
+impl<'a> dot::Labeller<'a, ClassNode<'a>, RelationEdge<'a>> for Diagram<'a> {
   fn graph_id(&self) -> dot::Id<'a> {
     dot::Id::new("diagram").unwrap()
   }
@@ -43,29 +43,36 @@ impl<'a> dot::Labeller<'a, ClassNode, RelationEdge> for Diagram<'a> {
 
   // relations
 
+  fn edge_label(&self, rel: &RelationEdge<'a>) -> dot::LabelText<'a> {
+    match rel.kind {
+      Relationship::Association { attribute_name } => dot::LabelText::label(attribute_name),
+      Relationship::Inheritance => dot::LabelText::label(""),
+    }
+  }
+
   fn edge_end_arrow(&self, rel: &RelationEdge) -> dot::Arrow {
     let Relation { ref kind, .. } = **rel;
     dot::Arrow::from_arrow(match kind {
-      Relationship::Association => dot::ArrowShape::Vee(dot::Side::Both),
+      Relationship::Association { .. } => dot::ArrowShape::Vee(dot::Side::Both),
       Relationship::Inheritance => dot::ArrowShape::Normal(dot::Fill::Open, dot::Side::Both),
     })
   }
 }
 
-impl<'a> dot::GraphWalk<'a, ClassNode, RelationEdge> for Diagram<'a> {
+impl<'a> dot::GraphWalk<'a, ClassNode<'a>, RelationEdge<'a>> for Diagram<'a> {
   fn nodes(&self) -> dot::Nodes<'a, ClassNode> {
     Cow::Borrowed(&self.classes)
   }
 
   fn edges(&self) -> dot::Edges<'a, RelationEdge> {
-    Cow::Borrowed(self.relations)
+    Cow::Borrowed(&self.relations)
   }
 
-  fn source(&self, rel: &RelationEdge) -> ClassNode {
+  fn source(&self, rel: &RelationEdge<'a>) -> ClassNode<'a> {
     Rc::clone(&rel.source)
   }
 
-  fn target(&self, rel: &RelationEdge) -> ClassNode {
+  fn target(&self, rel: &RelationEdge<'a>) -> ClassNode<'a> {
     Rc::clone(&rel.target)
   }
 }
