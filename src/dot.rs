@@ -4,26 +4,26 @@ extern crate itertools;
 use super::diagram::*;
 use std::borrow::Cow;
 use std::boxed::Box;
-use std::io;
 use std::rc::Rc;
 
-pub fn render<W: io::Write>(diagram: &Diagram, target: &mut W) -> Result<(), io::Error> {
-  dot::render(diagram, target)
-}
+pub use self::dot::render;
 
-impl<'a> dot::Labeller<'a, Rc<Class>, Box<Relation>> for Diagram<'a> {
+type ClassNode = Rc<Class>;
+type RelationEdge = Box<Relation>;
+
+impl<'a> dot::Labeller<'a, ClassNode, RelationEdge> for Diagram<'a> {
   fn graph_id(&self) -> dot::Id<'a> {
     dot::Id::new("diagram").unwrap()
   }
 
   // classes
 
-  fn node_id(&self, class: &Rc<Class>) -> dot::Id<'a> {
+  fn node_id(&self, class: &ClassNode) -> dot::Id<'a> {
     dot::Id::new(format!("class_{}", class.name))
       .expect(format!("Invalid class name: '{}'", class.name).as_str())
   }
 
-  fn node_label(&self, class: &Rc<Class>) -> dot::LabelText<'a> {
+  fn node_label(&self, class: &ClassNode) -> dot::LabelText<'a> {
     let Class {
       ref name,
       ref attributes,
@@ -37,13 +37,13 @@ impl<'a> dot::Labeller<'a, Rc<Class>, Box<Relation>> for Diagram<'a> {
     dot::LabelText::label(format!("{{ {} | {} }}", name, attributes))
   }
 
-  fn node_shape(&self, _class: &Rc<Class>) -> Option<dot::LabelText<'a>> {
+  fn node_shape(&self, _class: &ClassNode) -> Option<dot::LabelText<'a>> {
     Some(dot::LabelText::label("record"))
   }
 
   // relations
 
-  fn edge_end_arrow(&self, rel: &Box<Relation>) -> dot::Arrow {
+  fn edge_end_arrow(&self, rel: &RelationEdge) -> dot::Arrow {
     let Relation { ref kind, .. } = **rel;
     dot::Arrow::from_arrow(match kind {
       Relationship::Association => dot::ArrowShape::Vee(dot::Side::Both),
@@ -52,20 +52,20 @@ impl<'a> dot::Labeller<'a, Rc<Class>, Box<Relation>> for Diagram<'a> {
   }
 }
 
-impl<'a> dot::GraphWalk<'a, Rc<Class>, Box<Relation>> for Diagram<'a> {
-  fn nodes(&self) -> dot::Nodes<'a, Rc<Class>> {
+impl<'a> dot::GraphWalk<'a, ClassNode, RelationEdge> for Diagram<'a> {
+  fn nodes(&self) -> dot::Nodes<'a, ClassNode> {
     Cow::Borrowed(&self.classes)
   }
 
-  fn edges(&self) -> dot::Edges<'a, Box<Relation>> {
+  fn edges(&self) -> dot::Edges<'a, RelationEdge> {
     Cow::Borrowed(self.relations)
   }
 
-  fn source(&self, rel: &Box<Relation>) -> Rc<Class> {
+  fn source(&self, rel: &RelationEdge) -> ClassNode {
     Rc::clone(&rel.source)
   }
 
-  fn target(&self, rel: &Box<Relation>) -> Rc<Class> {
+  fn target(&self, rel: &RelationEdge) -> ClassNode {
     Rc::clone(&rel.target)
   }
 }
