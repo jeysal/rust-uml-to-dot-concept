@@ -35,19 +35,40 @@ pub struct Diagram<'a> {
 
 impl<'a> From<parser::Diagram<'a>> for Diagram<'a> {
   fn from(ast: parser::Diagram<'a>) -> Diagram<'a> {
-    // 1st pass: Create a set of class names to establish an index of types we know
+    // 1) Create a sets of class and superclass names
+    // to establish an index of types we know
     // as opposed to types we assume must be primitives.
-    let known_class_names: HashSet<&str> = ast
+    let declared_class_names: HashSet<&str> = ast
       .classes
       .iter()
       .map(|parser::Class { name, .. }| *name)
       .collect();
-
-    // 2nd pass: Collect classes with their primitive attributes
-    let class_map: HashMap<&str, Rc<Class>> = ast
+    let superclass_names: HashSet<&str> = ast
       .classes
       .iter()
+      .filter_map(|parser::Class { superclass, .. }| *superclass)
+      .collect();
+    let known_class_names: HashSet<&str> = declared_class_names
+      .union(&superclass_names)
+      .map(|name| name.clone())
+      .collect();
+
+    // 2) Create classes
+    let class_map: HashMap<&str, Rc<Class>> = superclass_names
+      .iter()
       .map(
+        // 2.1) empty for classes only known as superclasses
+        |name| {
+          (
+            *name,
+            Rc::new(Class {
+              name,
+              attributes: Vec::new(),
+            }),
+          )
+        },
+      )
+      .chain(ast.classes.iter().map(
         |parser::Class {
            name: class_name,
            attributes,
@@ -55,6 +76,7 @@ impl<'a> From<parser::Diagram<'a>> for Diagram<'a> {
          }| {
           (
             *class_name,
+            // 2.2) with their primitive attributes for declared classes
             Rc::new(Class {
               name: class_name,
               attributes: attributes
@@ -78,24 +100,24 @@ impl<'a> From<parser::Diagram<'a>> for Diagram<'a> {
             }),
           )
         },
-      )
+      ))
       .collect();
 
-    // 3rd pass: Create association relations for attributes of types we know
-    // and plain attributes otherwise.
-    // TODO inheritance relations
+    // 3) Create relations
     let relations: Vec<Box<Relation>> = ast
       .classes
       .iter()
       .flat_map(
         |parser::Class {
            name: class_name,
+           superclass,
            attributes,
-           ..
          }| {
+          let source = class_map.get(class_name).unwrap();
           attributes
             .iter()
             .filter_map(
+              // 3.1) Association relations for attributes of types we know
               |parser::Attribute {
                  typ,
                  name: attribute_name,
@@ -103,20 +125,31 @@ impl<'a> From<parser::Diagram<'a>> for Diagram<'a> {
                 if let Some(target) = class_map.get(typ) {
                   Some(Box::new(Relation {
                     kind: Relationship::Association { attribute_name },
-                    source: Rc::clone(class_map.get(class_name).unwrap()),
-                    target: Rc::clone(target),
+                    source: Rc::clone(&source),
+                    target: Rc::clone(&target),
                   }))
                 } else {
                   None
                 }
               },
             )
+            .chain(superclass.map(
+              // 3.2) Inheritance relations for superclasses
+              |superclass| {
+                let target = class_map.get(superclass).unwrap();
+                Box::new(Relation {
+                  kind: Relationship::Inheritance,
+                  source: Rc::clone(&source),
+                  target: Rc::clone(&target),
+                })
+              },
+            ))
             .collect::<Vec<Box<Relation>>>()
         },
       )
       .collect();
 
-    // Collect the classes from the class_map into a vector
+    // 4. Collect the classes from the class_map into a plain vector
     let classes: Vec<Rc<Class>> = class_map.into_iter().map(|(_, class)| class).collect();
 
     Diagram { classes, relations }

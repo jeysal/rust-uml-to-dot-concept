@@ -21,16 +21,20 @@ named!(
 
 named!(
   class<In, Class>,
-  map!(
-    preceded!(
-      delimited!(space0, tag!("class"), space1),
-      pair!(ws!(alphanumeric1), class_body)
-    ),
-    |(In(name), attributes)| Class {
-      name,
-      superclass: "", // TODO
-      attributes,
-    }
+  do_parse!(
+    space0 >>
+    tag!("class") >>
+    space1 >>
+    name: map!(ws!(alphanumeric1), |In(name)| name) >>
+    superclass: opt!(preceded!(
+        char!(':'),
+        map!(
+          ws!(alphanumeric1),
+          |In(superclass)| superclass
+        )
+      )) >>
+    attributes: class_body >>
+    (Class { name, superclass, attributes })
   )
 );
 named!(
@@ -201,12 +205,36 @@ mod tests {
   #[test]
   fn class_normal() {
     assert_eq!(
+      class(In("class A : B { a: A; b: B }")),
+      Ok((
+        In(""),
+        Class {
+          name: "A",
+          superclass: Some("B"),
+          attributes: vec![
+            Attribute {
+              name: "a",
+              typ: "A",
+            },
+            Attribute {
+              name: "b",
+              typ: "B",
+            },
+          ],
+        }
+      ))
+    )
+  }
+
+  #[test]
+  fn class_nosuper() {
+    assert_eq!(
       class(In("class A { a: A; b: B }")),
       Ok((
         In(""),
         Class {
           name: "A",
-          superclass: "",
+          superclass: None,
           attributes: vec![
             Attribute {
               name: "a",
@@ -225,12 +253,12 @@ mod tests {
   #[test]
   fn class_ws() {
     assert_eq!(
-      class(In(" class A { a : A ; b : B } ")),
+      class(In(" class A : B { a : A ; b : B } ")),
       Ok((
         In(""),
         Class {
           name: "A",
-          superclass: "",
+          superclass: Some("B"),
           attributes: vec![
             Attribute {
               name: "a",
@@ -254,12 +282,12 @@ mod tests {
   #[test]
   fn parse_normal() {
     assert_eq!(
-      parse("class A { a: A; b: B } class B { a: A }"),
+      parse("class A : B { a: A; b: B } class B { a: A }"),
       Ok(Diagram {
         classes: vec![
           Class {
             name: "A",
-            superclass: "",
+            superclass: Some("B"),
             attributes: vec![
               Attribute {
                 name: "a",
@@ -273,7 +301,7 @@ mod tests {
           },
           Class {
             name: "B",
-            superclass: "",
+            superclass: None,
             attributes: vec![Attribute {
               name: "a",
               typ: "A",
@@ -287,12 +315,12 @@ mod tests {
   #[test]
   fn parse_nows() {
     assert_eq!(
-      parse("class A{a:A;b:B}class B{a:A}"),
+      parse("class A:B{a:A;b:B}class B{a:A}"),
       Ok(Diagram {
         classes: vec![
           Class {
             name: "A",
-            superclass: "",
+            superclass: Some("B"),
             attributes: vec![
               Attribute {
                 name: "a",
@@ -306,7 +334,7 @@ mod tests {
           },
           Class {
             name: "B",
-            superclass: "",
+            superclass: None,
             attributes: vec![Attribute {
               name: "a",
               typ: "A",

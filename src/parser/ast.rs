@@ -6,7 +6,7 @@ pub struct Diagram<'a> {
 #[derive(Debug, PartialEq)]
 pub struct Class<'a> {
   pub name: &'a str,
-  pub superclass: &'a str,
+  pub superclass: Option<&'a str>,
   pub attributes: Vec<Attribute<'a>>,
 }
 
