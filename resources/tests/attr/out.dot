@@ -1,0 +1,3 @@
+digraph diagram {
+    class_A[label="{ A | x: X }"][shape="record"];
+}

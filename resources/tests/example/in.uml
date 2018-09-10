@@ -1,0 +1,12 @@
+class A : Unknown {
+  a: A;
+  x: u32;
+}
+
+class B : A {
+  y: string;
+}
+
+class C : A {
+  b: B;
+}

@@ -1,0 +1,5 @@
+digraph diagram {
+    class_A[label="{ A |  }"][shape="record"];
+    class_X[label="{ X |  }"][shape="record"];
+    class_A -> class_X[label="x"][arrowhead="vee"];
+}

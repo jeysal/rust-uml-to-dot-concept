@@ -1,0 +1,11 @@
+digraph diagram {
+    class_Unknown[label="{ Unknown |  }"][shape="record"];
+    class_A[label="{ A | x: u32 }"][shape="record"];
+    class_B[label="{ B | y: string }"][shape="record"];
+    class_C[label="{ C |  }"][shape="record"];
+    class_A -> class_Unknown[label=""][arrowhead="onormal"];
+    class_B -> class_A[label=""][arrowhead="onormal"];
+    class_C -> class_A[label=""][arrowhead="onormal"];
+    class_A -> class_A[label="a"][arrowhead="vee"];
+    class_C -> class_B[label="b"][arrowhead="vee"];
+}
